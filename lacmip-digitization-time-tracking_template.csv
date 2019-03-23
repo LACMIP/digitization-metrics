@@ -1,0 +1,2 @@
+date,LOC_cabinet,LOC_drawer,LOC_tray,LOC_locality,LOC_unit,LOC_subunit,LOC_age,TIME_idRehouse,TIME_count,TIME_paint,TIME_catalog,TIME_labels,TIME_number,LOTS_st,LOTS_tx,LOTS_uncataloged,ID_genusChange,ID_speciesChange,ID_sp,ID_rankUp,ID_rankDown,ID_new,REHOUSE_box3x1.5,REHOUSE_box3x3,REHOUSE_box3x4,REHOUSE_box3x6,REHOUSE_box4x6,REHOUSE_box6x6,REHOUSE_plastic3x3,REHOUSE_plastic6x6,REHOUSE_vial7dr,REHOUSE_vial3dr,REHOUSE_vial1dr
+2018-08-08,183,11,1 of 2,EXAMPLE LOCALITY,EXAMPLE UNIT,EXAMPLE SUBUNIT,EXAMPLE AGE,0.75,,0.25,0.3,0.1,0.2,0,25,0,0,0,0,0,0,0,19,2,4,0,0,0,0,0,5,1,19
