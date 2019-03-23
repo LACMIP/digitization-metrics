@@ -1,0 +1,8 @@
+name: "lacmip-digitization"
+navbar:
+  title: "LACMIP Digitization"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Digitization Metrics"
+      href: lacmip-digitization-metrics.html
