@@ -6,3 +6,4 @@ navbar:
       href: index.html
     - text: "Digitization Metrics"
       href: lacmip-digitization-metrics.html
+output_dir: "."
