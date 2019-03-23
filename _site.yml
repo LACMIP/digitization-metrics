@@ -1,9 +1,9 @@
 name: "lacmip-digitization"
+output_dir: "."
 navbar:
   title: "LACMIP Digitization"
-  left:
-    - text: "Home"
-      href: index.html
-    - text: "Digitization Metrics"
-      href: lacmip-digitization-metrics.html
-output_dir: "."
+  toc: true
+  toc_float: true
+  toc_depth: 2
+  df_print: kable
+  code_folding: show
