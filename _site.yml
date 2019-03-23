@@ -1,9 +1,0 @@
-name: "lacmip-digitization"
-output_dir: "."
-navbar:
-  title: "LACMIP Digitization"
-  toc: true
-  toc_float: true
-  toc_depth: 2
-  df_print: kable
-  code_folding: show
