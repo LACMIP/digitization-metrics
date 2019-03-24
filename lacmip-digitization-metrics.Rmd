@@ -8,12 +8,11 @@ output:
     df_print: kable
     code_folding: show
 ---
-
 ##Overview
 
-This document contains R code originally written to analyze the results of the "Cretaceous Seas of California" digitization project, supported by funding from the National Science Foundation (NSF DBI 1561429). The code below is designed to be reused with any dataset formatted to track daily digitization progress in the same way. A data template is available [here](FIX).
+This document contains R code originally written to analyze the results of the "Cretaceous Seas of California" digitization project, supported by funding from the National Science Foundation (NSF DBI 1561429). The code below is designed to be reused with any dataset formatted to track daily digitization progress in the same way. A data template is available [here](https://github.com/LACMIP/digitization-metrics/blob/master/template_lacmip-digitization-time-tracking.csv).
 
-If you want to re-use this code, you will need to open this file in R. Begin by loading the Tidyverse library (if you haven't already, you will also need to install the [Tidyverse package](https://cran.r-project.org/web/packages/tidyverse/index.html)):
+If you want to re-use this code, you should open [this file](https://github.com/LACMIP/digitization-metrics/blob/master/lacmip-digitization-metrics.Rmd) in R. Then begin by loading the Tidyverse library (if you haven't already, you will also need to install the [Tidyverse package](https://cran.r-project.org/web/packages/tidyverse/index.html)):
 ```{r}
 library(tidyverse)
 ```
@@ -25,7 +24,7 @@ height <- 10 #default dimension (inches) for saving JPG versions of graphs
 ```
 At this point you are ready to load the digitization time-tracking data you want to analyze into R. Edit the filename here to analyze a different dataset. Make sure your data file is in the correct working directory and formatted according to the template linked above.
 ```{r echo = TRUE, message = FALSE}
-data <- read_csv("K-CA-Digitization_2019-01-31.csv", na = character())
+data <- read_csv("input_K-CA-Digitization_2019-01-31.csv", na = character())
 ```
 
 ## Lots Processed
@@ -56,7 +55,8 @@ lots <- function(data) {
   
 }
 ```
-A total of **`r format(totalLots, 0)` specimen lots were digitized during the `r project` project**. Not all specimens were digitized, mostly due to poor quality of the original specimen. We can see a breakdown of lots processed by digitization status and collection area from the results of the function above:
+A total of **`r format(totalLots, 0)` specimen lots were digitized during the `r project` project**. Some specimens were evaluated as part of this project but digitized, mostly due to poor quality of the original specimen. We can see a breakdown of lots processed by digitization status and collection area from the results of the function above:
+
 
 ```{r echo = FALSE, message = FALSE}
 lots(data)
@@ -71,8 +71,6 @@ ggplot(plotLot, aes(x = "", y = count, fill = `lot type`)) +
     theme_minimal() +
     scale_fill_brewer(name = "Collection Area", palette = "Paired", labels = legendText) 
 ```
-
-
 
 ## Rehousing Supplies
 ### What rehousing supplies did this project use, and at what cost?
@@ -134,7 +132,7 @@ read_csv("output_supplies.csv", na = character())
 
 ## Taxonomic Improvements
 ### What taxonomic improvements were made during this project?
-Use the function below to report on the affect that this project had on the quantity and quality of taxonomic identifications for lots processed during its course.
+Use the function below to report on the effect that this project had on the quantity and quality of taxonomic identifications for lots processed during its course.
 ```{r}
 identifications <- function(data) {
   
@@ -143,12 +141,18 @@ identifications <- function(data) {
     select(matches("ID_")) %>% 
     summarise_all(funs(sum(.,na.rm = TRUE))) %>% 
     gather("identification action","count") %>% 
-    mutate(`identification action` = sub("ID_genusChange","genus name updated or redetermined",`identification action`)) %>% 
-    mutate(`identification action` = sub("ID_speciesChange","species name updated or redetermined",`identification action`)) %>% 
-    mutate(`identification action` = sub("ID_sp","evaluated but could not assign species name",`identification action`)) %>%
-    mutate(`identification action` = sub("ID_rank-up","taxonomic rank moved up  ",`identification action`)) %>%
-    mutate(`identification action` = sub("ID_rank-down","taxonomic rank moved down ",`identification action`)) %>%
-    mutate(`identification action` = sub("ID_new","taxonomic identification assigned for the first time",`identification action`)) %>%
+    mutate(`identification action` = 
+      sub("ID_genusChange","genus name updated or redetermined",`identification action`)) %>% 
+    mutate(`identification action` = 
+      sub("ID_speciesChange","species name updated or redetermined",`identification action`)) %>% 
+    mutate(`identification action` = 
+      sub("ID_sp","evaluated but could not assign species name",`identification action`)) %>%
+    mutate(`identification action` = 
+      sub("ID_rank-up","taxonomic rank moved up  ",`identification action`)) %>%
+    mutate(`identification action` = 
+      sub("ID_rank-down","taxonomic rank moved down ",`identification action`)) %>%
+    mutate(`identification action` = 
+      sub("ID_new","identification assigned for the first time",`identification action`)) %>%
     mutate("% total lots" = round((count/totalLots*100),1))
   
   #calculate the total percent of specimen lots affected by taxonomic identification action and
@@ -168,8 +172,8 @@ read_csv("output_identifications.csv", na = character())
 ```
 
 ## Digitization Rate
-### What was this project's digitization rate over time?
-Use the function below to report on the rate of digitization over the lifespan of this project.
+### What was this project's overall digitization rate?
+Use the function below to report on the rate of digitization over the lifespan of this project, as measured by the number of specimen lots processed.
 ```{r}
 digitizationRate <- function(data) {
   
@@ -192,30 +196,28 @@ digitizationRate <- function(data) {
   write_csv(buildDigitizationRate, "output_digitizationRate.csv")
   
   #graph digitization rate by month
-  graphDigitizationRate <<- 
-    ggplot(buildDigitizationRate, aes(x = month, y = lots)) + 
+  graphDigitizationRate <- buildDigitizationRate %>% 
+    ggplot(aes(x = month, y = lots)) + 
     geom_col() +
     labs(title = "LACMIP Digitization Rate by Lots",
          subtitle = project,
-         y = "# of lots processed",
-         x = "") +
+         y = "# of Lots Processed",
+         x = "\nMonth") +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
   
   #output graph to file
   ggsave("output_digitizationRate.jpg", plot = graphDigitizationRate, 
-         width = width, height = height, units = "cm", dpi = "print")
+         width = width*1.5, height = height, units = "cm", dpi = "print")
   
 }
 ```
-The `r project` project digitization rate is graphed below by the number of lots processed over time, an **average of `r round(averageLots,0)` specimen lots per month**.
-
 ```{r echo = FALSE, message = FALSE}
 digitizationRate(data)
-graphDigitizationRate
 ```
 
-## Digitization Analysis
+![The `r project` project digitization rate is graphed here by the number of lots processed over time, an **average of `r round(averageLots,0)` specimen lots per month**.](output_digitizationRate.jpg)
+
 ### What digitization tasks required the most time?
 Use the function below to report on the time required to perform each of the core tasks associated with specimen digitization.
 ```{r}
@@ -240,7 +242,8 @@ digitizationTask <- function(data) {
     mutate(minutesPerCatalog = round(`TIME_catalog`*60/lotsProcessed,1)) %>% 
     mutate(minutesPerLabels = round(`TIME_labels`*60/lotsProcessed,1)) %>% 
     mutate(minutesPerNumber = round(`TIME_number`*60/lotsProcessed,1)) %>% 
-    select(date, matches("LOC_"), matches("minutes"), lotsProcessed, lotsRehoused, lotsIdentified, lotsReidentified)
+    select(date, matches("LOC_"), matches("minutes"), 
+      lotsProcessed, lotsRehoused, lotsIdentified, lotsReidentified)
   
   #output results to file
   write_csv(buildDigitizationTask, "output_digitizationTask.csv")
@@ -257,18 +260,19 @@ digitizationTask <- function(data) {
   
   #(FIX - set factor to re-order tasks in graph, by natural sequence)
   #graph average minutes per specimen lot per task
-  graphDigitizationTaskAvg <<- buildDigitizationTaskAvg %>% 
+  graphDigitizationTaskAvg <- buildDigitizationTaskAvg %>% 
     ggplot(aes(x = Task, y = `Time (min/lot)`, label = `Time (min/lot)`)) + 
     geom_bar(stat = "identity") + 
-    labs(title = "LACMIP Average Digitization Rate by Task",
+    labs(title = "LACMIP Digitization Time per Task",
          subtitle = project,
-         y = "time per lot (minutes)",
-         x = "") +
+         y = "Time per Lot (minutes)",
+         x = "\nTask") +
     theme_minimal() +
     geom_text(vjust = 0, nudge_y = 0.05)
   
   #output graph to file
-  ggsave("output_graphDigitizationTaskAvg.jpg", plot = graphDigitizationTaskAvg, width = width*1.5, height = height, units = "cm", dpi = "print")
+  ggsave("output_digitizationTaskAvg.jpg", plot = graphDigitizationTaskAvg, 
+         width = width, height = height, units = "cm", dpi = "print")
   
   #calculate average minutes per specimen lot per task over time
   buildDigitizationTaskTime <- buildDigitizationTask %>%
@@ -279,53 +283,53 @@ digitizationTask <- function(data) {
     mutate(task = sub("minutesPer","",task))
     
   #graph average minutes per specimen lot (all tasks) over time
-  graphDigitizationTaskTime_total <<- buildDigitizationTaskTime %>% 
+  graphDigitizationTaskTime_total <- buildDigitizationTaskTime %>% 
     filter(task == "minutesTotal") %>% 
     ggplot(aes(x = date, y = minutesPerSpm)) + 
     geom_point() +
     geom_smooth(method = lm) +
     labs(title = "LACMIP Digitization Rate by Time per Lot",
          subtitle = project,
-         y = "time per lot (minutes)",
-         x = "") +
+         y = "Time per Lot (minutes)",
+         x = "\nProject Duration") +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
   
   #output graph to file
-  ggsave("output_digitizationTaskTime_total.jpg", plot = graphDigitizationTaskTime_total, width = width*1.5, height = height, units = "cm", dpi = "print")
+  ggsave("output_digitizationTaskTime_total.jpg", plot = graphDigitizationTaskTime_total, 
+         width = width*1.5, height = height, units = "cm", dpi = "print")
   
   #graph average minutes per specimen lot per task over time
-  graphDigitizationTaskTime_task <<- buildDigitizationTaskTime %>% 
+  graphDigitizationTaskTime_task <- buildDigitizationTaskTime %>% 
     spread(task, minutesPerSpm) %>% 
     select(-Count, -minutesTotal) %>% 
     filter_all(all_vars(!is.na(.))) %>% 
     gather("task", "minutesPerSpm", -date) %>% 
     ggplot(aes(x = as.factor(date), y = minutesPerSpm, group = task, color = task)) + 
     geom_line() +
-    #coord_cartesian(ylim = c(0, 20)) +
+    #coord_cartesian(ylim = c(0, 40)) +
     facet_grid(rows = vars(task), scales = "free") +
-    labs(title = "LACMIP digitization rate by task",
+    labs(title = "LACMIP Digitization Rate by Task",
          subtitle = project,
-         y = "time per lot (minutes)",
-         x = "project duration (days)") +
+         y = "Time per Lot (minutes)",
+         x = "\nProject Duration") +
     theme_minimal() +
     theme(axis.text.x = element_blank())
   
   #output graph to file
-  ggsave("output_digitizationTaskTime_task.jpg", plot = graphDigitizationTaskTime_task, width = width*1.5, height = height, units = "cm", dpi = "print")
+  ggsave("output_digitizationTaskTime_task.jpg", plot = graphDigitizationTaskTime_task, 
+         width = width*1.5, height = height, units = "cm", dpi = "print")
 
 }
 ```
-The average time per specimen lot per task is graphed below.
 ```{r echo = FALSE, message = FALSE}
 digitizationTask(data)
-graphDigitizationTaskAvg
 ```
-The average time to process a specimen lot including all tasks is graphed below.
-```{r}
-graphDigitizationTaskTime_total
-```
-A comparion between tasks over time is graphed below.
-```{r}
-graphDigitizationTaskTime_task
-```
+
+![Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here.](output_digitizationTaskAvg.jpg)
+
+![The digitization rate over time broken up by task is graphed here](output_digitizationTaskTime_task.jpg)
+
+### What factors effected digitization rates?
+
+![The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, with no clear indication that overall project duration affected digitization rate.](output_digitizationTaskTime_total.jpg)
