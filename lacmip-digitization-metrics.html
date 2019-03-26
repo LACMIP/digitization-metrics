@@ -537,7 +537,7 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
 <p>Use the function below to report on the time required to perform each of the core tasks associated with specimen digitization.</p>
 <pre class="r"><code>digitizationTask &lt;- function(data) {
   
-  #streamline main data for task time analysis
+  #streamline main data for task analysis
   buildDigitizationTask &lt;- data %&gt;% 
     mutate(lotsProcessed = select(., matches(&quot;LOTS_&quot;),-LOTS_uncataloged) 
            %&gt;% rowSums(na.rm = TRUE)) %&gt;% 
@@ -547,8 +547,6 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
            %&gt;% rowSums(na.rm = TRUE)) %&gt;% 
     mutate(lotsReidentified = select(., matches(&quot;ID_&quot;),-ID_new) 
            %&gt;% rowSums(na.rm = TRUE)) %&gt;% 
-    mutate(minutesTotal = select(., matches(&quot;TIME_&quot;),-ID_new) 
-           %&gt;% rowSums(na.rm = TRUE)) %&gt;% 
     filter(lotsProcessed!=0) %&gt;% 
     mutate(minutesPerIDRehouse = round(`TIME_idRehouse`*60/lotsProcessed,1)) %&gt;% 
     mutate(minutesPerCount = round(`TIME_count`*60/lotsProcessed,1)) %&gt;% 
@@ -556,6 +554,8 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
     mutate(minutesPerCatalog = round(`TIME_catalog`*60/lotsProcessed,1)) %&gt;% 
     mutate(minutesPerLabels = round(`TIME_labels`*60/lotsProcessed,1)) %&gt;% 
     mutate(minutesPerNumber = round(`TIME_number`*60/lotsProcessed,1)) %&gt;% 
+    mutate(minutesPerTotal = select(., matches(&quot;minutesPer&quot;)) 
+           %&gt;% rowSums(na.rm = TRUE)) %&gt;% 
     select(date, matches(&quot;LOC_&quot;), matches(&quot;minutes&quot;), 
       lotsProcessed, lotsRehoused, lotsIdentified, lotsReidentified)
   
@@ -572,14 +572,19 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
         round(mean(buildDigitizationTask$minutesPerLabels, na.rm = TRUE),1),
         round(mean(buildDigitizationTask$minutesPerNumber, na.rm = TRUE),1)))
   
-  #(FIX - set factor to re-order tasks in graph, by natural sequence)
+  #calculate average minutes per specimen lot (all tasks) and
+  #save as an object in the global environment to access from markdown text
+  averageTimePerLot &lt;&lt;- sum(buildDigitizationTaskAvg$`Time (min/lot)`)
+
   #graph average minutes per specimen lot per task
-  graphDigitizationTaskAvg &lt;- buildDigitizationTaskAvg %&gt;% 
+  graphDigitizationTaskAvg &lt;&lt;- buildDigitizationTaskAvg %&gt;% 
     ggplot(aes(x = Task, y = `Time (min/lot)`, label = `Time (min/lot)`)) + 
-    geom_bar(stat = &quot;identity&quot;) + 
+    geom_bar(stat = &quot;identity&quot;) +
+    scale_x_discrete (limits = c(&quot;Identify &amp; Rehouse&quot;,&quot;Count&quot;,
+                      &quot;Catalog&quot;,&quot;Paint&quot;,&quot;Number&quot;,&quot;Place Labels&quot;)) +
     labs(title = &quot;LACMIP Digitization Time per Task&quot;,
          subtitle = project,
-         y = &quot;Time per Lot (minutes)&quot;,
+         y = &quot;Average Time per Lot (minutes)&quot;,
          x = &quot;\nTask&quot;) +
     theme_minimal() +
     geom_text(vjust = 0, nudge_y = 0.05)
@@ -593,30 +598,20 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
     select(date, starts_with(&quot;minutes&quot;)) %&gt;% 
     gather(&quot;task&quot;,&quot;time&quot;,-date, na.rm = TRUE) %&gt;% 
     group_by(date, task) %&gt;% 
-    summarise(minutesPerSpm = sum(time)) %&gt;% 
-    mutate(task = sub(&quot;minutesPer&quot;,&quot;&quot;,task))
-    
-  #graph average minutes per specimen lot (all tasks) over time
-  graphDigitizationTaskTime_total &lt;- buildDigitizationTaskTime %&gt;% 
-    filter(task == &quot;minutesTotal&quot;) %&gt;% 
-    ggplot(aes(x = date, y = minutesPerSpm)) + 
-    geom_point() +
-    geom_smooth(method = lm) +
-    labs(title = &quot;LACMIP Digitization Rate by Time per Lot&quot;,
-         subtitle = project,
-         y = &quot;Time per Lot (minutes)&quot;,
-         x = &quot;\nProject Duration&quot;) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    mutate(minutesPerSpm = round(mean(time, na.rm = TRUE),1)) %&gt;% 
+    ungroup() %&gt;% 
+    mutate(task = sub(&quot;minutesPer&quot;,&quot;&quot;,task)) %&gt;% 
+    select(-time) %&gt;% 
+    distinct()
   
-  #output graph to file
-  ggsave(&quot;output_digitizationTaskTime_total.jpg&quot;, plot = graphDigitizationTaskTime_total, 
-         width = width*1.5, height = height, units = &quot;cm&quot;, dpi = &quot;print&quot;)
+  #[FIX] set factor to order tasks according to natural sequence
+  #buildDigitizationTaskTime$task2 = factor(buildDigitizationTaskTime$task, levels = 
+  #    c(&quot;IDRehouse&quot;,&quot;Count&quot;,&quot;Catalog&quot;,&quot;Paint&quot;,&quot;Number&quot;,&quot;Labels&quot;))
   
   #graph average minutes per specimen lot per task over time
-  graphDigitizationTaskTime_task &lt;- buildDigitizationTaskTime %&gt;% 
+  graphDigitizationTaskTime_task &lt;&lt;- buildDigitizationTaskTime %&gt;% 
     spread(task, minutesPerSpm) %&gt;% 
-    select(-Count, -minutesTotal) %&gt;% 
+    select(-Count, -Total) %&gt;% 
     filter_all(all_vars(!is.na(.))) %&gt;% 
     gather(&quot;task&quot;, &quot;minutesPerSpm&quot;, -date) %&gt;% 
     ggplot(aes(x = as.factor(date), y = minutesPerSpm, group = task, color = task)) + 
@@ -625,7 +620,7 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
     facet_grid(rows = vars(task), scales = &quot;free&quot;) +
     labs(title = &quot;LACMIP Digitization Rate by Task&quot;,
          subtitle = project,
-         y = &quot;Time per Lot (minutes)&quot;,
+         y = &quot;Average Time per Lot (minutes)&quot;,
          x = &quot;\nProject Duration&quot;) +
     theme_minimal() +
     theme(axis.text.x = element_blank())
@@ -633,23 +628,44 @@ height &lt;- 10 #default dimension (inches) for saving JPG versions of graphs</c
   #output graph to file
   ggsave(&quot;output_digitizationTaskTime_task.jpg&quot;, plot = graphDigitizationTaskTime_task, 
          width = width*1.5, height = height, units = &quot;cm&quot;, dpi = &quot;print&quot;)
+    
+  #graph average minutes per specimen lot (all tasks) over time
+  graphDigitizationTaskTime_total &lt;&lt;- buildDigitizationTaskTime %&gt;% 
+    filter(task == &quot;Total&quot;) %&gt;% 
+    ggplot(aes(x = date, y = minutesPerSpm)) + 
+    geom_point() +
+    geom_smooth() +
+    labs(title = &quot;LACMIP Digitization Rate by Time per Lot&quot;,
+         subtitle = project,
+         y = &quot;Average Time per Lot (minutes)&quot;,
+         x = &quot;\nProject Duration&quot;) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+  
+  #output graph to file
+  ggsave(&quot;output_digitizationTaskTime_total.jpg&quot;, plot = graphDigitizationTaskTime_total, 
+         width = width*1.5, height = height, units = &quot;cm&quot;, dpi = &quot;print&quot;)
+  
+  #[FIX TITLE] calculate average minutes per specimen lot per task over time
+  #buildDigitizationTaskFactor &lt;- 
+  
+  #graph average minutes per specimen lot (all tasks) over time, faceted by formation
+  #graphDigitizationTaskFactor &lt;&lt;- 
+  
+  #output graph to file
+  #ggsave(&quot;output_digitizationFactor_formation.jpg&quot;, plot = graphDigitizationFactor_formation, 
+  #       width = width*1.5, height = height, units = &quot;cm&quot;, dpi = &quot;print&quot;)
 
 }</code></pre>
-<div class="figure">
-<img src="output_digitizationTaskAvg.jpg" alt="Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here." />
-<p class="caption">Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here.</p>
+<p>Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here:</p>
+<p><img src="lacmip-digitization-metrics_files/figure-html/unnamed-chunk-14-1.png" width="672" /></p>
+<p>The digitization rate over time broken up by task is graphed here:</p>
+<p><img src="lacmip-digitization-metrics_files/figure-html/unnamed-chunk-15-1.png" width="672" /></p>
 </div>
-<div class="figure">
-<img src="output_digitizationTaskTime_task.jpg" alt="The digitization rate over time broken up by task is graphed here" />
-<p class="caption">The digitization rate over time broken up by task is graphed here</p>
-</div>
-</div>
-<div id="what-factors-effected-digitization-rates" class="section level3">
-<h3>What factors effected digitization rates?</h3>
-<div class="figure">
-<img src="output_digitizationTaskTime_total.jpg" alt="The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, with no clear indication that overall project duration affected digitization rate." />
-<p class="caption">The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, with no clear indication that overall project duration affected digitization rate.</p>
-</div>
+<div id="what-factors-affected-digitization-rates" class="section level3">
+<h3>What factors affected digitization rates?</h3>
+<p>The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, clearly indicating that overall project duration affected digitization rate. <strong>Over the course of the project as a whole, each specimen lot took an average of 5.5 minutes per lot to process.</strong></p>
+<p><img src="lacmip-digitization-metrics_files/figure-html/unnamed-chunk-16-1.png" width="672" /></p>
 </div>
 </div>
 

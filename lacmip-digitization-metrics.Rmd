@@ -60,9 +60,9 @@ A total of **`r format(totalLots, 0)` specimen lots were digitized during the `r
 
 ```{r echo = FALSE, message = FALSE}
 lots(data)
-plotLot <- read_csv("output_lots.csv", na = character())
-legendText <- c(paste("Digitized - Stratigraphic (", plotLot$`%`[1], "%)", sep = ""), paste("Digitized - Taxonomic (", plotLot$`%`[2], "%)", sep = ""), paste("not digitized (", plotLot$`%`[3], "%)", sep = ""))
-ggplot(plotLot, aes(x = "", y = count, fill = `lot type`)) + 
+graphLot <- read_csv("output_lots.csv", na = character())
+legendText <- c(paste("Digitized - Stratigraphic (", graphLot$`%`[1], "%)", sep = ""), paste("Digitized - Taxonomic (", graphLot$`%`[2], "%)", sep = ""), paste("not digitized (", graphLot$`%`[3], "%)", sep = ""))
+ggplot(graphLot, aes(x = "", y = count, fill = `lot type`)) + 
     geom_bar(stat = "identity", position = "stack") + 
     labs(title = "LACMIP Lots Processed",
          subtitle = project,
@@ -223,7 +223,7 @@ Use the function below to report on the time required to perform each of the cor
 ```{r}
 digitizationTask <- function(data) {
   
-  #streamline main data for task time analysis
+  #streamline main data for task analysis
   buildDigitizationTask <- data %>% 
     mutate(lotsProcessed = select(., matches("LOTS_"),-LOTS_uncataloged) 
            %>% rowSums(na.rm = TRUE)) %>% 
@@ -233,8 +233,6 @@ digitizationTask <- function(data) {
            %>% rowSums(na.rm = TRUE)) %>% 
     mutate(lotsReidentified = select(., matches("ID_"),-ID_new) 
            %>% rowSums(na.rm = TRUE)) %>% 
-    mutate(minutesTotal = select(., matches("TIME_"),-ID_new) 
-           %>% rowSums(na.rm = TRUE)) %>% 
     filter(lotsProcessed!=0) %>% 
     mutate(minutesPerIDRehouse = round(`TIME_idRehouse`*60/lotsProcessed,1)) %>% 
     mutate(minutesPerCount = round(`TIME_count`*60/lotsProcessed,1)) %>% 
@@ -242,6 +240,8 @@ digitizationTask <- function(data) {
     mutate(minutesPerCatalog = round(`TIME_catalog`*60/lotsProcessed,1)) %>% 
     mutate(minutesPerLabels = round(`TIME_labels`*60/lotsProcessed,1)) %>% 
     mutate(minutesPerNumber = round(`TIME_number`*60/lotsProcessed,1)) %>% 
+    mutate(minutesPerTotal = select(., matches("minutesPer")) 
+           %>% rowSums(na.rm = TRUE)) %>% 
     select(date, matches("LOC_"), matches("minutes"), 
       lotsProcessed, lotsRehoused, lotsIdentified, lotsReidentified)
   
@@ -258,14 +258,19 @@ digitizationTask <- function(data) {
         round(mean(buildDigitizationTask$minutesPerLabels, na.rm = TRUE),1),
         round(mean(buildDigitizationTask$minutesPerNumber, na.rm = TRUE),1)))
   
-  #(FIX - set factor to re-order tasks in graph, by natural sequence)
+  #calculate average minutes per specimen lot (all tasks) and
+  #save as an object in the global environment to access from markdown text
+  averageTimePerLot <<- sum(buildDigitizationTaskAvg$`Time (min/lot)`)
+
   #graph average minutes per specimen lot per task
-  graphDigitizationTaskAvg <- buildDigitizationTaskAvg %>% 
+  graphDigitizationTaskAvg <<- buildDigitizationTaskAvg %>% 
     ggplot(aes(x = Task, y = `Time (min/lot)`, label = `Time (min/lot)`)) + 
-    geom_bar(stat = "identity") + 
+    geom_bar(stat = "identity") +
+    scale_x_discrete (limits = c("Identify & Rehouse","Count",
+                      "Catalog","Paint","Number","Place Labels")) +
     labs(title = "LACMIP Digitization Time per Task",
          subtitle = project,
-         y = "Time per Lot (minutes)",
+         y = "Average Time per Lot (minutes)",
          x = "\nTask") +
     theme_minimal() +
     geom_text(vjust = 0, nudge_y = 0.05)
@@ -279,30 +284,20 @@ digitizationTask <- function(data) {
     select(date, starts_with("minutes")) %>% 
     gather("task","time",-date, na.rm = TRUE) %>% 
     group_by(date, task) %>% 
-    summarise(minutesPerSpm = sum(time)) %>% 
-    mutate(task = sub("minutesPer","",task))
-    
-  #graph average minutes per specimen lot (all tasks) over time
-  graphDigitizationTaskTime_total <- buildDigitizationTaskTime %>% 
-    filter(task == "minutesTotal") %>% 
-    ggplot(aes(x = date, y = minutesPerSpm)) + 
-    geom_point() +
-    geom_smooth(method = lm) +
-    labs(title = "LACMIP Digitization Rate by Time per Lot",
-         subtitle = project,
-         y = "Time per Lot (minutes)",
-         x = "\nProject Duration") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    mutate(minutesPerSpm = round(mean(time, na.rm = TRUE),1)) %>% 
+    ungroup() %>% 
+    mutate(task = sub("minutesPer","",task)) %>% 
+    select(-time) %>% 
+    distinct()
   
-  #output graph to file
-  ggsave("output_digitizationTaskTime_total.jpg", plot = graphDigitizationTaskTime_total, 
-         width = width*1.5, height = height, units = "cm", dpi = "print")
+  #[FIX] set factor to order tasks according to natural sequence
+  #buildDigitizationTaskTime$task2 = factor(buildDigitizationTaskTime$task, levels = 
+  #    c("IDRehouse","Count","Catalog","Paint","Number","Labels"))
   
   #graph average minutes per specimen lot per task over time
-  graphDigitizationTaskTime_task <- buildDigitizationTaskTime %>% 
+  graphDigitizationTaskTime_task <<- buildDigitizationTaskTime %>% 
     spread(task, minutesPerSpm) %>% 
-    select(-Count, -minutesTotal) %>% 
+    select(-Count, -Total) %>% 
     filter_all(all_vars(!is.na(.))) %>% 
     gather("task", "minutesPerSpm", -date) %>% 
     ggplot(aes(x = as.factor(date), y = minutesPerSpm, group = task, color = task)) + 
@@ -311,7 +306,7 @@ digitizationTask <- function(data) {
     facet_grid(rows = vars(task), scales = "free") +
     labs(title = "LACMIP Digitization Rate by Task",
          subtitle = project,
-         y = "Time per Lot (minutes)",
+         y = "Average Time per Lot (minutes)",
          x = "\nProject Duration") +
     theme_minimal() +
     theme(axis.text.x = element_blank())
@@ -319,6 +314,33 @@ digitizationTask <- function(data) {
   #output graph to file
   ggsave("output_digitizationTaskTime_task.jpg", plot = graphDigitizationTaskTime_task, 
          width = width*1.5, height = height, units = "cm", dpi = "print")
+    
+  #graph average minutes per specimen lot (all tasks) over time
+  graphDigitizationTaskTime_total <<- buildDigitizationTaskTime %>% 
+    filter(task == "Total") %>% 
+    ggplot(aes(x = date, y = minutesPerSpm)) + 
+    geom_point() +
+    geom_smooth() +
+    labs(title = "LACMIP Digitization Rate by Time per Lot",
+         subtitle = project,
+         y = "Average Time per Lot (minutes)",
+         x = "\nProject Duration") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+  
+  #output graph to file
+  ggsave("output_digitizationTaskTime_total.jpg", plot = graphDigitizationTaskTime_total, 
+         width = width*1.5, height = height, units = "cm", dpi = "print")
+  
+  #[FIX TITLE] calculate average minutes per specimen lot per task over time
+  #buildDigitizationTaskFactor <- 
+  
+  #graph average minutes per specimen lot (all tasks) over time, faceted by formation
+  #graphDigitizationTaskFactor <<- 
+  
+  #output graph to file
+  #ggsave("output_digitizationFactor_formation.jpg", plot = graphDigitizationFactor_formation, 
+  #       width = width*1.5, height = height, units = "cm", dpi = "print")
 
 }
 ```
@@ -326,10 +348,21 @@ digitizationTask <- function(data) {
 digitizationTask(data)
 ```
 
-![Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here.](output_digitizationTaskAvg.jpg)
+Digitization is comprised of specific tasks, often completed by people with different roles in the project (staff, student, volunteer, etc.). LACMIP identified and tracked six specific digitization tasks, and the average time required to complete each task for one specimen lot is graphed here:
 
-![The digitization rate over time broken up by task is graphed here](output_digitizationTaskTime_task.jpg)
+```{r echo = FALSE, message = FALSE}
+graphDigitizationTaskAvg
+```
 
-### What factors effected digitization rates?
+The digitization rate over time broken up by task is graphed here:
 
-![The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, with no clear indication that overall project duration affected digitization rate.](output_digitizationTaskTime_total.jpg)
+```{r echo = FALSE, message = FALSE}
+graphDigitizationTaskTime_task
+```
+
+### What factors affected digitization rates?
+The average time to digitize a single specimen lot (all tasks included) varied, as shown in the graph here, clearly indicating that overall project duration affected digitization rate. **Over the course of the project as a whole, each specimen lot took an average of `r averageTimePerLot` minutes per lot to process.**
+
+```{r echo = FALSE, message = FALSE}
+graphDigitizationTaskTime_total
+```
